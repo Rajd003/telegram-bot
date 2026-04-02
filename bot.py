@@ -1,8 +1,10 @@
+import asyncio
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler
 
 TOKEN = "7241764201:AAF2QraxrJXWerLG0ayotQ8mzKoSyEgha8Y"
 
+# Start
 async def start(update, context):
     keyboard = [
         [InlineKeyboardButton("📱 Get Number", callback_data='get_number')],
@@ -14,6 +16,7 @@ async def start(update, context):
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
+# Button click
 async def button_click(update, context):
     query = update.callback_query
     await query.answer()
@@ -24,9 +27,14 @@ async def button_click(update, context):
     elif query.data == 'balance':
         await query.edit_message_text("💰 Balance: ₹0")
 
-app = ApplicationBuilder().token(TOKEN).build()
+# Main run
+async def main():
+    app = ApplicationBuilder().token(TOKEN).build()
 
-app.add_handler(CommandHandler("start", start))
-app.add_handler(CallbackQueryHandler(button_click))
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CallbackQueryHandler(button_click))
 
-app.run_polling()
+    await app.run_polling()
+
+if __name__ == "__main__":
+    asyncio.run(main())
