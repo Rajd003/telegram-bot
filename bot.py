@@ -4,7 +4,6 @@ from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandle
 
 TOKEN = "7241764201:AAF2QraxrJXWerLG0ayotQ8mzKoSyEgha8Y"
 
-# Start
 async def start(update, context):
     keyboard = [
         [InlineKeyboardButton("📱 Get Number", callback_data='get_number')],
@@ -16,7 +15,6 @@ async def start(update, context):
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-# Button click
 async def button_click(update, context):
     query = update.callback_query
     await query.answer()
@@ -27,7 +25,6 @@ async def button_click(update, context):
     elif query.data == 'balance':
         await query.edit_message_text("💰 Balance: ₹0")
 
-# Main run
 async def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
