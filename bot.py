@@ -1,72 +1,86 @@
 import asyncio
 import csv
 import os
-import random
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    CallbackQueryHandler,
+    MessageHandler,
+    ContextTypes,
+    filters,
+)
+
 from pymongo import MongoClient
 
-# 🔐 ENV VARIABLES
-TOKEN = os.getenv("BOT_TOKEN")
+# ================== ENV ==================
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
-
 MONGO_URI = os.getenv("MONGO_URI")
 
-# 🔥 MongoDB
+# ================== MongoDB ==================
 client = MongoClient(MONGO_URI)
 db = client["sms_bot"]
 collection = db["numbers"]
 
-# 🔹 Start
-async def start(update, context):
+# ================== Fake Web Server (Render Fix) ==================
+class Handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b'Bot is running')
+
+def run_web():
+    port = int(os.environ.get("PORT", 10000))
+    server = HTTPServer(("0.0.0.0", port), Handler)
+    server.serve_forever()
+
+threading.Thread(target=run_web).start()
+
+# ================== START ==================
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton("📱 Get Number", callback_data='get_number')],
         [InlineKeyboardButton("💰 Balance", callback_data='balance')]
     ]
 
     await update.message.reply_text(
-        "✨ Welcome 👋\n\nSelect an option:",
+        "👋 Welcome to Bot",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-# 🔹 Button Click
-async def button_click(update, context):
+# ================== BUTTON ==================
+async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
     if query.data == 'get_number':
 
-        numbers = list(collection.find({"status": "free"}))
+        number_data = collection.find_one({"status": "free"})
 
-        if not numbers:
+        if not number_data:
             await query.edit_message_text("❌ No number available")
             return
 
-        number_data = random.choice(numbers)
-
-        # mark used
         collection.update_one(
             {"_id": number_data["_id"]},
             {"$set": {"status": "used"}}
         )
 
-        try:
-            await query.edit_message_text(
-                f"✅ Service: {number_data['service']}\n"
-                f"🌍 Country: {number_data['country']}\n"
-                f"📱 Number: {number_data['number']}"
-            )
-        except:
-            await query.message.reply_text("❌ Error showing number")
+        await query.edit_message_text(
+            f"✅ Service: {number_data['service']}\n"
+            f"🌍 Country: {number_data['country']}\n"
+            f"📱 Number: {number_data['number']}"
+        )
 
     elif query.data == 'balance':
-        try:
-            await query.edit_message_text("💰 Balance: ₹0")
-        except:
-            await query.message.reply_text("💰 Balance: ₹0")
+        await query.edit_message_text("💰 Balance: 0")
 
-# 🔹 Admin add single number
-async def add_number(update, context):
+# ================== ADD NUMBER ==================
+async def add_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.from_user.id != ADMIN_ID:
         return
 
@@ -76,7 +90,7 @@ async def add_number(update, context):
         number = context.args[2]
 
         if collection.find_one({"number": number}):
-            await update.message.reply_text("⚠️ Number already exists")
+            await update.message.reply_text("⚠️ Already exists")
             return
 
         collection.insert_one({
@@ -86,20 +100,20 @@ async def add_number(update, context):
             "status": "free"
         })
 
-        await update.message.reply_text("✅ Number added")
+        await update.message.reply_text("✅ Added")
 
     except:
         await update.message.reply_text("❌ Use: /add service country number")
 
-# 🔹 CSV Upload
-async def upload_csv(update, context):
+# ================== CSV UPLOAD ==================
+async def upload_csv(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.from_user.id != ADMIN_ID:
         return
 
     document = update.message.document
 
     if not document or not document.file_name.endswith(".csv"):
-        await update.message.reply_text("❌ Please upload CSV file")
+        await update.message.reply_text("❌ Send CSV file")
         return
 
     file = await document.get_file()
@@ -113,12 +127,7 @@ async def upload_csv(update, context):
         reader = csv.DictReader(f)
 
         for row in reader:
-            number = row.get("number")
-            service = row.get("service")
-            country = row.get("country")
-
-            if not number:
-                continue
+            number = row["number"]
 
             if collection.find_one({"number": number}):
                 skipped += 1
@@ -126,8 +135,8 @@ async def upload_csv(update, context):
 
             collection.insert_one({
                 "number": number,
-                "service": service,
-                "country": country,
+                "service": row["service"],
+                "country": row["country"],
                 "status": "free"
             })
             added += 1
@@ -136,17 +145,17 @@ async def upload_csv(update, context):
         f"✅ Added: {added}\n⚠️ Skipped: {skipped}"
     )
 
-# 🔹 Main
-def main():
-    app = ApplicationBuilder().token(TOKEN).build()
+# ================== MAIN ==================
+async def main():
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("add", add_number))
     app.add_handler(MessageHandler(filters.Document.ALL, upload_csv))
     app.add_handler(CallbackQueryHandler(button_click))
 
-    app.run_polling()
-
+    print("🤖 Bot Running...")
+    await app.run_polling()
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
