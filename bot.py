@@ -1,140 +1,163 @@
-import os
-from telegram import *
-from telegram.ext import *
-from pymongo import MongoClient
+from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+import csv
+import random
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-MONGO_URI = os.getenv("MONGO_URI")
+BOT_TOKEN = "YOUR_BOT_TOKEN"
 
-client = MongoClient(MONGO_URI)
-db = client["sms_bot"]
-collection = db["numbers"]
-
-# ================= START =================
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# ===== MENU KEYBOARD (ONLY USED IN /start) =====
+def menu_keyboard():
     keyboard = [
-        [InlineKeyboardButton("📱 Get Number", callback_data="get_number"),
-         InlineKeyboardButton("🌍 Available Country", callback_data="countries")],
-        [InlineKeyboardButton("✅ Active Number", callback_data="active"),
-         InlineKeyboardButton("☎️ Support", callback_data="support")]
+        ["📱 Get Number", "🌍 Available Country"],
+        ["✅ Active Number", "☎️ Support"]
     ]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
+# ===== LOAD CSV DATA =====
+def load_numbers():
+    data = {}
+    try:
+        with open("numbers.csv", newline='') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                country = row["country"]
+                service = row["service"]
+                number = row["number"]
+
+                if country not in data:
+                    data[country] = {}
+
+                if service not in data[country]:
+                    data[country][service] = []
+
+                data[country][service].append(number)
+    except:
+        pass
+
+    return data
+
+# ===== START =====
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Welcome! Choose your option:",
-        reply_markup=InlineKeyboardMarkup(keyboard)
+        reply_markup=menu_keyboard()
     )
 
-# ================= GET NUMBER =================
-async def get_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# ===== BUTTON HANDLER =====
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text
+    data = load_numbers()
+
+    # 👉 GET NUMBER
+    if text == "📱 Get Number":
+        countries = list(data.keys())
+
+        if not countries:
+            await update.message.reply_text("❌ No country available")
+            return
+
+        buttons = []
+        for c in countries:
+            buttons.append([InlineKeyboardButton(c, callback_data=f"country_{c}")])
+
+        await update.message.reply_text(
+            "🌍 Select Country:",
+            reply_markup=InlineKeyboardMarkup(buttons)
+        )
+
+    # 👉 AVAILABLE COUNTRY
+    elif text == "🌍 Available Country":
+        countries = list(data.keys())
+        if countries:
+            msg = "\n".join(countries)
+        else:
+            msg = "No country available"
+
+        await update.message.reply_text(f"🌍 Available Countries:\n{msg}")
+
+    # 👉 ACTIVE NUMBER
+    elif text == "✅ Active Number":
+        await update.message.reply_text("🚧 Feature coming soon")
+
+    # 👉 SUPPORT
+    elif text == "☎️ Support":
+        await update.message.reply_text("📞 Contact: @yourusername")
+
+
+# ===== CALLBACK HANDLER =====
+async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    countries = collection.distinct("country")
+    data = load_numbers()
 
-    keyboard = []
-    for c in countries:
-        count = collection.count_documents({"country": c, "status": "free"})
-        keyboard.append([
-            InlineKeyboardButton(f"{c} ({count})", callback_data=f"country_{c}")
-        ])
+    # 👉 COUNTRY SELECT
+    if query.data.startswith("country_"):
+        country = query.data.split("_")[1]
 
-    await query.edit_message_text(
-        "🌍 Select Country:",
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+        services = data.get(country, {})
 
-# ================= SELECT COUNTRY =================
-async def select_country(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
+        buttons = []
+        for s in services:
+            buttons.append([InlineKeyboardButton(s, callback_data=f"service_{country}_{s}")])
 
-    country = query.data.split("_")[1]
+        await query.message.reply_text(
+            f"📡 Select Service for {country}:",
+            reply_markup=InlineKeyboardMarkup(buttons)
+        )
 
-    services = collection.distinct("service", {"country": country})
+    # 👉 SERVICE SELECT
+    elif query.data.startswith("service_"):
+        parts = query.data.split("_")
+        country = parts[1]
+        service = parts[2]
 
-    keyboard = []
-    for s in services:
-        count = collection.count_documents({
-            "country": country,
-            "service": s,
-            "status": "free"
-        })
+        numbers = data[country][service]
 
-        keyboard.append([
-            InlineKeyboardButton(f"{s} ({count})", callback_data=f"service_{country}_{s}")
-        ])
+        if not numbers:
+            await query.message.reply_text("❌ No number available")
+            return
 
-    await query.edit_message_text(
-        f"📡 Select Service ({country}):",
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+        number = random.choice(numbers)
 
-# ================= SELECT SERVICE =================
-async def select_service(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-
-    _, country, service = query.data.split("_")
-
-    data = collection.find_one({
-        "country": country,
-        "service": service,
-        "status": "free"
-    })
-
-    if not data:
-        await query.edit_message_text("❌ No number available")
-        return
-
-    collection.update_one({"_id": data["_id"]}, {"$set": {"status": "used"}})
-
-    number = data["number"]
-
-    keyboard = [
-        [InlineKeyboardButton("📩 View OTP", url="https://t.me/your_group")],
-        [
-            InlineKeyboardButton("🔄 Change Number", callback_data=f"service_{country}_{service}"),
-            InlineKeyboardButton("🌍 Change Country", callback_data="get_number")
+        buttons = [
+            [InlineKeyboardButton("📩 View OTP", url="https://t.me/yourgroup")],
+            [
+                InlineKeyboardButton("🔄 Change Number", callback_data=f"service_{country}_{service}"),
+                InlineKeyboardButton("🌍 Change Country", callback_data="back_country")
+            ]
         ]
-    ]
 
-    await query.edit_message_text(
-        f"🌍 {country} {service} Number Assigned\n\n"
-        f"📱 Number: `{number}`\n\n"
-        f"⏳ Wait for OTP...",
-        parse_mode="Markdown",
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+        await query.message.reply_text(
+            f"📲 {country} {service} Number:\n\n`+{number}`",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(buttons)
+        )
 
-# ================= OTHER BUTTON =================
-async def other(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
+    # 👉 BACK TO COUNTRY
+    elif query.data == "back_country":
+        countries = list(data.keys())
 
-    if query.data == "countries":
-        countries = collection.distinct("country")
-        text = "\n".join(countries)
-        await query.edit_message_text(f"🌍 Available Countries:\n{text}")
+        buttons = []
+        for c in countries:
+            buttons.append([InlineKeyboardButton(c, callback_data=f"country_{c}")])
 
-    elif query.data == "active":
-        await query.edit_message_text("✅ No active number (demo)")
+        await query.message.reply_text(
+            "🌍 Select Country:",
+            reply_markup=InlineKeyboardMarkup(buttons)
+        )
 
-    elif query.data == "support":
-        await query.edit_message_text("☎️ Contact: @your_username")
 
-# ================= MAIN =================
-def main():
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
+# ===== RUN BOT =====
+app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    app.add_handler(CommandHandler("start", start))
+app.add_handler(CommandHandler("start", start))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+app.add_handler(MessageHandler(filters.ALL, lambda u, c: None))  # prevent duplicate
 
-    app.add_handler(CallbackQueryHandler(get_number, pattern="get_number"))
-    app.add_handler(CallbackQueryHandler(select_country, pattern="^country_"))
-    app.add_handler(CallbackQueryHandler(select_service, pattern="^service_"))
-    app.add_handler(CallbackQueryHandler(other))
+app.add_handler(
+    MessageHandler(filters.UpdateType.CALLBACK_QUERY, button_click)
+)
 
-    print("Bot Running...")
-    app.run_polling()
-
-if __name__ == "__main__":
-    main()
+print("Bot running...")
+app.run_polling()
