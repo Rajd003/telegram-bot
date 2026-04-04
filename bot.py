@@ -21,12 +21,16 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
 MONGO_URI = os.getenv("MONGO_URI")
 
-# ================== MongoDB ==================
-client = MongoClient(MONGO_URI)
-db = client["sms_bot"]
-collection = db["numbers"]
+# ================== MongoDB (SAFE CONNECT) ==================
+try:
+    client = MongoClient(MONGO_URI)
+    db = client["sms_bot"]
+    collection = db["numbers"]
+    print("✅ Mongo Connected")
+except Exception as e:
+    print("❌ Mongo Error:", e)
 
-# ================== Fake Web Server (Render Fix) ==================
+# ================== Fake Server (Render fix) ==================
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -48,7 +52,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
 
     await update.message.reply_text(
-        "👋 Welcome to Bot",
+        "👋 Welcome to Number Bot",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
@@ -58,23 +62,26 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     if query.data == 'get_number':
+        try:
+            number_data = collection.find_one({"status": "free"})
 
-        number_data = collection.find_one({"status": "free"})
+            if not number_data:
+                await query.edit_message_text("❌ No number available")
+                return
 
-        if not number_data:
-            await query.edit_message_text("❌ No number available")
-            return
+            collection.update_one(
+                {"_id": number_data["_id"]},
+                {"$set": {"status": "used"}}
+            )
 
-        collection.update_one(
-            {"_id": number_data["_id"]},
-            {"$set": {"status": "used"}}
-        )
+            await query.edit_message_text(
+                f"✅ Service: {number_data['service']}\n"
+                f"🌍 Country: {number_data['country']}\n"
+                f"📱 Number: {number_data['number']}"
+            )
 
-        await query.edit_message_text(
-            f"✅ Service: {number_data['service']}\n"
-            f"🌍 Country: {number_data['country']}\n"
-            f"📱 Number: {number_data['number']}"
-        )
+        except Exception as e:
+            await query.edit_message_text(f"❌ Error: {e}")
 
     elif query.data == 'balance':
         await query.edit_message_text("💰 Balance: 0")
@@ -100,7 +107,7 @@ async def add_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "status": "free"
         })
 
-        await update.message.reply_text("✅ Added")
+        await update.message.reply_text("✅ Number Added")
 
     except:
         await update.message.reply_text("❌ Use: /add service country number")
@@ -154,8 +161,12 @@ async def main():
     app.add_handler(MessageHandler(filters.Document.ALL, upload_csv))
     app.add_handler(CallbackQueryHandler(button_click))
 
-    print("🤖 Bot Running...")
+    print("🤖 Bot Running Successfully...")
     await app.run_polling()
 
+# ================== RUN ==================
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except RuntimeError:
+        pass
