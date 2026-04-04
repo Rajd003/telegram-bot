@@ -137,7 +137,7 @@ async def upload_csv(update, context):
     )
 
 # 🔹 Main
-async def main():
+def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
@@ -145,7 +145,8 @@ async def main():
     app.add_handler(MessageHandler(filters.Document.ALL, upload_csv))
     app.add_handler(CallbackQueryHandler(button_click))
 
-    await app.run_polling()
+    app.run_polling()
+
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
