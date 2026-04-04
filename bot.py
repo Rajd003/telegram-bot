@@ -25,7 +25,7 @@ def run_web():
     server = HTTPServer(("0.0.0.0", port), Handler)
     server.serve_forever()
 
-threading.Thread(target=run_web).start()
+threading.Thread(target=run_web, daemon=True).start()
 
 # ========= START =========
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -39,50 +39,58 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     )
 
-# ========= GET NUMBER =========
-async def get_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# ========= STEP 1: COUNTRY =========
+async def get_country(update: Update, context: ContextTypes.DEFAULT_TYPE):
     countries = collection.distinct("country")
-
-    if not countries:
-        await update.message.reply_text("❌ No country available")
-        return
 
     buttons = []
     for c in countries:
-        count = collection.count_documents({
-            "country": c,
-            "status": "free"
-        })
-
+        count = collection.count_documents({"country": c, "status": "free"})
         if count > 0:
-            buttons.append([
-                InlineKeyboardButton(
-                    f"{c} ({count})",
-                    callback_data=f"country_{c}"
-                )
-            ])
-
-    if not buttons:
-        await update.message.reply_text("❌ No number available")
-        return
+            buttons.append([InlineKeyboardButton(f"{c} ({count})", callback_data=f"country_{c}")])
 
     await update.message.reply_text(
         "🌍 Select Country:",
         reply_markup=InlineKeyboardMarkup(buttons)
     )
 
-# ========= COUNTRY SELECT =========
-async def country_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# ========= STEP 2: SERVICE =========
+async def service_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    if not query.data.startswith("country_"):
-        return
-
     country = query.data.replace("country_", "")
+
+    services = collection.distinct("service", {"country": country})
+
+    buttons = []
+    for s in services:
+        count = collection.count_documents({
+            "country": country,
+            "service": s,
+            "status": "free"
+        })
+
+        if count > 0:
+            buttons.append([
+                InlineKeyboardButton(f"{s} ({count})", callback_data=f"get_{country}_{s}")
+            ])
+
+    await query.edit_message_text(
+        f"📱 Select Service for {country}:",
+        reply_markup=InlineKeyboardMarkup(buttons)
+    )
+
+# ========= STEP 3: NUMBER =========
+async def get_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    _, country, service = query.data.split("_")
 
     data = collection.find_one({
         "country": country,
+        "service": service,
         "status": "free"
     })
 
@@ -96,18 +104,18 @@ async def country_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     text = f"""
-🌍 {country} Fresh Number Assigned
+🌍 {country}
+📱 Service: {service}
 
-📱 Number:
-`{data['number']}`
+📞 `{data['number']}`
 
 ⏳ Wait for OTP...
 """
 
     buttons = [
-        [InlineKeyboardButton("📩 View OTP", url="https://t.me/otpbossrahul")],
+        [InlineKeyboardButton("📩 View OTP", url="https://t.me/your_group")],
         [
-            InlineKeyboardButton("🔄 Change Number", callback_data=f"country_{country}"),
+            InlineKeyboardButton("🔄 Change Number", callback_data=f"get_{country}_{service}"),
             InlineKeyboardButton("🌍 Change Country", callback_data="back")
         ]
     ]
@@ -123,39 +131,18 @@ async def back(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    countries = collection.distinct("country")
+    await get_country(update, context)
 
-    buttons = []
-    for c in countries:
-        count = collection.count_documents({
-            "country": c,
-            "status": "free"
-        })
-
-        if count > 0:
-            buttons.append([
-                InlineKeyboardButton(
-                    f"{c} ({count})",
-                    callback_data=f"country_{c}"
-                )
-            ])
-
-    await query.edit_message_text(
-        "🌍 Select Country:",
-        reply_markup=InlineKeyboardMarkup(buttons)
-    )
-
-# ========= TEXT HANDLER =========
+# ========= MENU HANDLER =========
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
     if text == "📱 Get Number":
-        await get_number(update, context)
+        await get_country(update, context)
 
     elif text == "🌍 Available Country":
         countries = collection.distinct("country")
-        msg = "\n".join(countries)
-        await update.message.reply_text(f"🌍 Countries:\n{msg}")
+        await update.message.reply_text("\n".join(countries))
 
     elif text == "✅ Active Number":
         await update.message.reply_text("📭 No active number")
@@ -170,8 +157,9 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))
 
+    app.add_handler(CallbackQueryHandler(service_select, pattern="^country_"))
+    app.add_handler(CallbackQueryHandler(get_number, pattern="^get_"))
     app.add_handler(CallbackQueryHandler(back, pattern="^back$"))
-    app.add_handler(CallbackQueryHandler(country_select))
 
     print("🤖 Bot Running...")
     app.run_polling()
