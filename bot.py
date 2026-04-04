@@ -153,7 +153,7 @@ async def upload_csv(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 # ================== MAIN ==================
-async def main():
+def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
@@ -162,11 +162,9 @@ async def main():
     app.add_handler(CallbackQueryHandler(button_click))
 
     print("🤖 Bot Running Successfully...")
-    await app.run_polling()
+    
+    app.run_polling()
 
-# ================== RUN ==================
+
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except RuntimeError:
-        pass
+    main()
