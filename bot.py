@@ -1,6 +1,5 @@
 import asyncio
 import csv
-import re
 import os
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -46,7 +45,6 @@ threading.Thread(target=run_web).start()
 
 # ================== START ==================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     keyboard = [
         [InlineKeyboardButton("📱 Get Number", callback_data="get")],
         [InlineKeyboardButton("🌍 Available Country", callback_data="country")],
@@ -54,28 +52,22 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("☎️ Support", callback_data="support")]
     ]
 
-    # MAIN MENU
     await update.message.reply_text(
         "👋 Welcome! Choose your option:",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-    # REMOVE OLD BUTTON (IMPORTANT 🔥)
-    await update.message.reply_text(
-        " ",
-        reply_markup=ReplyKeyboardRemove()
-    )
+    await update.message.reply_text(" ", reply_markup=ReplyKeyboardRemove())
 
+# ================== COPY ==================
 async def copy_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
     num = query.data.split("_")[1]
 
-    await query.answer(
-        text=f"Copied: {num}",
-        show_alert=True
-    )
+    await query.answer(text=f"Copied: {num}", show_alert=True)
+
 # ================== GET COUNTRY ==================
 async def get_country(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -86,23 +78,14 @@ async def get_country(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     for c in countries:
         count = numbers_col.count_documents({"country": c, "status": "free"})
-        buttons.append([
-            InlineKeyboardButton(f"{c} ({count})", callback_data=f"country_{c}")
-        ])
+        buttons.append([InlineKeyboardButton(f"{c} ({count})", callback_data=f"country_{c}")])
 
     buttons.append([InlineKeyboardButton("🔙 Back", callback_data="back_main")])
 
-    num = number['number']
-
-keyboard = [
-    [InlineKeyboardButton("📋 Copy Number", callback_data=f"copy_{num}")],  # 👈 ADD HERE
-    [InlineKeyboardButton("📩 View OTP", callback_data="otp")],
-    [
-        InlineKeyboardButton("🔄 Change Number", callback_data=f"change_{country}"),
-        InlineKeyboardButton("🌍 Change Country", callback_data="get")
-    ],
-    [InlineKeyboardButton("🔙 Back", callback_data="back_main")]
-]
+    await query.edit_message_text(
+        "🌍 Select Country:",
+        reply_markup=InlineKeyboardMarkup(buttons)
+    )
 
 # ================== SELECT COUNTRY ==================
 async def select_country(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -116,10 +99,7 @@ async def select_country(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("❌ No number available")
         return
 
-    numbers_col.update_one(
-        {"_id": number["_id"]},
-        {"$set": {"status": "used"}}
-    )
+    numbers_col.update_one({"_id": number["_id"]}, {"$set": {"status": "used"}})
 
     users_col.update_one(
         {"user_id": query.from_user.id},
@@ -145,35 +125,6 @@ async def select_country(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-    if not number:
-        await query.edit_message_text("❌ No number available")
-        return
-
-    numbers_col.update_one(
-        {"_id": number["_id"]},
-        {"$set": {"status": "used"}}
-    )
-
-    users_col.update_one(
-        {"user_id": query.from_user.id},
-        {"$set": {"number_id": number["_id"]}},
-        upsert=True
-    )
-
-    num = number['number']
-
-keyboard = [
-    [InlineKeyboardButton("📋 Copy Number", callback_data=f"copy_{num}")],  # 👈 ADD HERE
-    [InlineKeyboardButton("📩 View OTP", callback_data="otp")],
-    [
-        InlineKeyboardButton("🔄 Change Number", callback_data=f"change_{country}"),
-        InlineKeyboardButton("🌍 Change Country", callback_data="get")
-    ],
-    [InlineKeyboardButton("🔙 Back", callback_data="back_main")]
-]
-
-    
-
 # ================== CHANGE NUMBER ==================
 async def change_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -181,22 +132,17 @@ async def change_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     country = query.data.split("_")[1]
 
-    number = numbers_col.find_one({
-        "country": country,
-        "status": "free"
-    })
-
+    number = numbers_col.find_one({"country": country, "status": "free"})
     if not number:
         await query.edit_message_text("❌ No new number")
         return
 
-    numbers_col.update_one(
-        {"_id": number["_id"]},
-        {"$set": {"status": "used"}}
-    )
+    numbers_col.update_one({"_id": number["_id"]}, {"$set": {"status": "used"}})
+
+    num = number['number']
 
     keyboard = [
-        [InlineKeyboardButton("📩 View OTP", url="https://t.me/yourchannel")],
+        [InlineKeyboardButton("📋 Copy Number", callback_data=f"copy_{num}")],
         [
             InlineKeyboardButton("🔄 Change Number", callback_data=f"change_{country}"),
             InlineKeyboardButton("🌍 Change Country", callback_data="get")
@@ -205,7 +151,8 @@ async def change_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
 
     await query.edit_message_text(
-        f"🔄 New Number:\n\n📱 {number['number']}",
+        f"🔄 New Number:\n\n📱 `{num}`",
+        parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
@@ -222,50 +169,12 @@ async def active_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     number = numbers_col.find_one({"_id": user["number_id"]})
 
-    await query.edit_message_text(
-        f"📱 Active Number:\n{number['number']}"
-    )
+    await query.edit_message_text(f"📱 Active Number:\n{number['number']}")
 
 # ================== SUPPORT ==================
-async def select_country(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def support(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-
-    country = query.data.split("_")[1]
-
-    number = numbers_col.find_one({"country": country, "status": "free"})
-    if not number:
-        await query.edit_message_text("❌ No number available")
-        return
-
-    numbers_col.update_one(
-        {"_id": number["_id"]},
-        {"$set": {"status": "used"}}
-    )
-
-    users_col.update_one(
-        {"user_id": query.from_user.id},
-        {"$set": {"number_id": number["_id"]}},
-        upsert=True
-    )
-
-    num = number['number']
-
-    keyboard = [
-        [InlineKeyboardButton("📋 Copy Number", callback_data=f"copy_{num}")],
-        [InlineKeyboardButton("📩 View OTP", callback_data="otp")],
-        [
-            InlineKeyboardButton("🔄 Change Number", callback_data=f"change_{country}"),
-            InlineKeyboardButton("🌍 Change Country", callback_data="get")
-        ],
-        [InlineKeyboardButton("🔙 Back", callback_data="back_main")]
-    ]
-
-    await query.edit_message_text(
-        f"✅ {country} Number Assigned\n\n📱 `{num}`",
-        parse_mode="Markdown",
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
 
     await query.edit_message_text("📞 Contact: @your_username")
 
@@ -273,11 +182,6 @@ async def select_country(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def back_main(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-await query.edit_message_text(
-    f"✅ {country} Number Assigned\n\n📱 `{num}`",
-    parse_mode="Markdown",
-    reply_markup=InlineKeyboardMarkup(keyboard)
-)
 
     keyboard = [
         [InlineKeyboardButton("📱 Get Number", callback_data="get")],
@@ -286,18 +190,10 @@ await query.edit_message_text(
         [InlineKeyboardButton("☎️ Support", callback_data="support")]
     ]
 
-    num = number['number']
-
-keyboard = [
-    [InlineKeyboardButton("📋 Copy Number", callback_data=f"copy_{num}")],
-    [InlineKeyboardButton("📩 View OTP", callback_data="otp")],
-    [
-        InlineKeyboardButton("🔄 Change Number", callback_data=f"change_{country}"),
-        InlineKeyboardButton("🌍 Change Country", callback_data="get")
-    ],
-    [InlineKeyboardButton("🔙 Back", callback_data="back_main")]
-]
-
+    await query.edit_message_text(
+        "🏠 Main Menu:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
 
 # ================== CSV UPLOAD ==================
 async def upload_csv(update: Update, context: ContextTypes.DEFAULT_TYPE):
