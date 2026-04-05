@@ -66,7 +66,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=ReplyKeyboardRemove()
     )
 
+async def copy_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        query = update.callback_query
+        await query.answer()
 
+    num = query.data.split("_")[1]
+
+    await query.answer(
+        text=f"Copied: {num}",
+        show_alert=True
+    )
 # ================== GET COUNTRY ==================
 async def get_country(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -329,16 +338,8 @@ def main():
     app.add_handler(CallbackQueryHandler(active_number, pattern="^active$"))
     app.add_handler(CallbackQueryHandler(support, pattern="^support$"))
     app.add_handler(CallbackQueryHandler(copy_number, pattern="^copy_"))
-    async def copy_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-
-    num = query.data.split("_")[1]
-
-    await query.answer(
-        text=f"Copied: {num}",
-        show_alert=True
-    )
+     
+    
     app.add_handler(CallbackQueryHandler(back_main, pattern="^back_main$"))
 
     app.add_handler(MessageHandler(filters.Document.ALL, upload_csv))
