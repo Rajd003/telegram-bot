@@ -172,10 +172,7 @@ keyboard = [
     [InlineKeyboardButton("🔙 Back", callback_data="back_main")]
 ]
 
-await query.edit_message_text(
-        f"✅ {country} Number Assigned\n\n📱 {number['number']}",
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+    
 
 # ================== CHANGE NUMBER ==================
 async def change_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
