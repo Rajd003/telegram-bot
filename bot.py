@@ -158,7 +158,7 @@ app.add_handler(MessageHandler(filters.ALL, lambda u, c: None))  # prevent dupli
 from telegram.ext import CallbackQueryHandler
 
 app.add_handler(CallbackQueryHandler(button_click))
-)
+
 
 print("Bot running...")
 app.run_polling()
