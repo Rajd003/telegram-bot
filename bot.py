@@ -1,11 +1,14 @@
 from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram.ext import (
+    ApplicationBuilder, CommandHandler, MessageHandler,
+    CallbackQueryHandler, ContextTypes, filters
+)
 import csv
 import random
 
 BOT_TOKEN = "8660826415:AAHsDMwGFatbX-x1kYxO_5mm-oKr2HKiRpk"
 
-# ===== MENU KEYBOARD (ONLY USED IN /start) =====
+# ===== MENU =====
 def menu_keyboard():
     keyboard = [
         ["📱 Get Number", "🌍 Available Country"],
@@ -13,7 +16,7 @@ def menu_keyboard():
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
-# ===== LOAD CSV DATA =====
+# ===== LOAD CSV =====
 def load_numbers():
     data = {}
     try:
@@ -24,15 +27,9 @@ def load_numbers():
                 service = row["service"]
                 number = row["number"]
 
-                if country not in data:
-                    data[country] = {}
-
-                if service not in data[country]:
-                    data[country][service] = []
-
-                data[country][service].append(number)
-    except:
-        pass
+                data.setdefault(country, {}).setdefault(service, []).append(number)
+    except Exception as e:
+        print("CSV Error:", e)
 
     return data
 
@@ -43,12 +40,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=menu_keyboard()
     )
 
-# ===== BUTTON HANDLER =====
+# ===== MAIN BUTTON HANDLER =====
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     data = load_numbers()
 
-    # 👉 GET NUMBER
+    # GET NUMBER
     if text == "📱 Get Number":
         countries = list(data.keys())
 
@@ -56,33 +53,27 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ No country available")
             return
 
-        buttons = []
-        for c in countries:
-            buttons.append([InlineKeyboardButton(c, callback_data=f"country_{c}")])
+        buttons = [[InlineKeyboardButton(c, callback_data=f"country|{c}")] for c in countries]
 
         await update.message.reply_text(
             "🌍 Select Country:",
             reply_markup=InlineKeyboardMarkup(buttons)
         )
 
-    # 👉 AVAILABLE COUNTRY
+    # AVAILABLE COUNTRY
     elif text == "🌍 Available Country":
         countries = list(data.keys())
-        if countries:
-            msg = "\n".join(countries)
-        else:
-            msg = "No country available"
+        msg = "\n".join(countries) if countries else "No country available"
 
         await update.message.reply_text(f"🌍 Available Countries:\n{msg}")
 
-    # 👉 ACTIVE NUMBER
+    # ACTIVE NUMBER
     elif text == "✅ Active Number":
-        await update.message.reply_text("🚧 Feature coming soon")
+        await update.message.reply_text("🚧 Coming soon")
 
-    # 👉 SUPPORT
+    # SUPPORT
     elif text == "☎️ Support":
         await update.message.reply_text("📞 Contact: @yourusername")
-
 
 # ===== CALLBACK HANDLER =====
 async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -91,28 +82,31 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     data = load_numbers()
 
-    # 👉 COUNTRY SELECT
-    if query.data.startswith("country_"):
-        country = query.data.split("_")[1]
+    # COUNTRY SELECT
+    if query.data.startswith("country|"):
+        country = query.data.split("|")[1]
 
         services = data.get(country, {})
 
-        buttons = []
-        for s in services:
-            buttons.append([InlineKeyboardButton(s, callback_data=f"service_{country}_{s}")])
+        if not services:
+            await query.message.reply_text("❌ No service available")
+            return
+
+        buttons = [
+            [InlineKeyboardButton(s, callback_data=f"service|{country}|{s}")]
+            for s in services
+        ]
 
         await query.message.reply_text(
-            f"📡 Select Service for {country}:",
+            f"📡 Select Service ({country}):",
             reply_markup=InlineKeyboardMarkup(buttons)
         )
 
-    # 👉 SERVICE SELECT
-    elif query.data.startswith("service_"):
-        parts = query.data.split("_")
-        country = parts[1]
-        service = parts[2]
+    # SERVICE SELECT
+    elif query.data.startswith("service|"):
+        _, country, service = query.data.split("|")
 
-        numbers = data[country][service]
+        numbers = data.get(country, {}).get(service, [])
 
         if not numbers:
             await query.message.reply_text("❌ No number available")
@@ -123,8 +117,8 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
         buttons = [
             [InlineKeyboardButton("📩 View OTP", url="https://t.me/yourgroup")],
             [
-                InlineKeyboardButton("🔄 Change Number", callback_data=f"service_{country}_{service}"),
-                InlineKeyboardButton("🌍 Change Country", callback_data="back_country")
+                InlineKeyboardButton("🔄 Change Number", callback_data=f"service|{country}|{service}"),
+                InlineKeyboardButton("🌍 Change Country", callback_data="back")
             ]
         ]
 
@@ -134,31 +128,23 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=InlineKeyboardMarkup(buttons)
         )
 
-    # 👉 BACK TO COUNTRY
-    elif query.data == "back_country":
+    # BACK BUTTON
+    elif query.data == "back":
         countries = list(data.keys())
 
-        buttons = []
-        for c in countries:
-            buttons.append([InlineKeyboardButton(c, callback_data=f"country_{c}")])
+        buttons = [[InlineKeyboardButton(c, callback_data=f"country|{c}")] for c in countries]
 
         await query.message.reply_text(
             "🌍 Select Country:",
             reply_markup=InlineKeyboardMarkup(buttons)
         )
 
-
-# ===== RUN BOT =====
+# ===== RUN =====
 app = ApplicationBuilder().token(BOT_TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-app.add_handler(MessageHandler(filters.ALL, lambda u, c: None))  # prevent duplicate
-
-from telegram.ext import CallbackQueryHandler
-
 app.add_handler(CallbackQueryHandler(button_click))
-
 
 print("Bot running...")
 app.run_polling()
