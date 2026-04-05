@@ -71,6 +71,8 @@ async def get_country(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardButton(f"{c} ({count})", callback_data=f"country_{c}")
         ])
 
+    buttons.append([InlineKeyboardButton("🔙 Back", callback_data="back_main")])
+
     await query.edit_message_text(
         "🌍 Select Country:",
         reply_markup=InlineKeyboardMarkup(buttons)
@@ -108,7 +110,8 @@ async def select_country(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [
             InlineKeyboardButton("🔄 Change Number", callback_data=f"change_{country}"),
             InlineKeyboardButton("🌍 Change Country", callback_data="get")
-        ]
+        ],
+        [InlineKeyboardButton("🔙 Back", callback_data="back_main")]
     ]
 
     await query.edit_message_text(
@@ -142,7 +145,8 @@ async def change_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [
             InlineKeyboardButton("🔄 Change Number", callback_data=f"change_{country}"),
             InlineKeyboardButton("🌍 Change Country", callback_data="get")
-        ]
+        ],
+        [InlineKeyboardButton("🔙 Back", callback_data="back_main")]
     ]
 
     await query.edit_message_text(
@@ -173,6 +177,23 @@ async def support(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     await query.edit_message_text("📞 Contact: @your_username")
+
+# ================== BACK ==================
+async def back_main(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    keyboard = [
+        [InlineKeyboardButton("📱 Get Number", callback_data="get")],
+        [InlineKeyboardButton("🌍 Available Country", callback_data="country")],
+        [InlineKeyboardButton("📞 Active Number", callback_data="active")],
+        [InlineKeyboardButton("☎️ Support", callback_data="support")]
+    ]
+
+    await query.edit_message_text(
+        "👋 Welcome! Choose your option:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
 
 # ================== CSV UPLOAD ==================
 async def upload_csv(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -209,6 +230,8 @@ def main():
     app.add_handler(CallbackQueryHandler(change_number, pattern="^change_"))
     app.add_handler(CallbackQueryHandler(active_number, pattern="^active$"))
     app.add_handler(CallbackQueryHandler(support, pattern="^support$"))
+    app.add_handler(CallbackQueryHandler(back_main, pattern="^back_main$"))
+
     app.add_handler(MessageHandler(filters.Document.ALL, upload_csv))
 
     print("🤖 Bot Running...")
