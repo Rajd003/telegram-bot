@@ -155,8 +155,9 @@ app.add_handler(CommandHandler("start", start))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 app.add_handler(MessageHandler(filters.ALL, lambda u, c: None))  # prevent duplicate
 
-app.add_handler(
-    MessageHandler(filters.UpdateType.CALLBACK_QUERY, button_click)
+from telegram.ext import CallbackQueryHandler
+
+app.add_handler(CallbackQueryHandler(button_click))
 )
 
 print("Bot running...")
