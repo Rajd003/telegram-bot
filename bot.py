@@ -273,6 +273,11 @@ async def select_country(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def back_main(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+await query.edit_message_text(
+    f"✅ {country} Number Assigned\n\n📱 `{num}`",
+    parse_mode="Markdown",
+    reply_markup=InlineKeyboardMarkup(keyboard)
+)
 
     keyboard = [
         [InlineKeyboardButton("📱 Get Number", callback_data="get")],
@@ -293,11 +298,6 @@ keyboard = [
     [InlineKeyboardButton("🔙 Back", callback_data="back_main")]
 ]
 
-await query.edit_message_text(
-    f"✅ {country} Number Assigned\n\n📱 `{num}`",
-    parse_mode="Markdown",
-    reply_markup=InlineKeyboardMarkup(keyboard)
-)
 
 # ================== CSV UPLOAD ==================
 async def upload_csv(update: Update, context: ContextTypes.DEFAULT_TYPE):
