@@ -83,10 +83,17 @@ async def get_country(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     buttons.append([InlineKeyboardButton("🔙 Back", callback_data="back_main")])
 
-    await query.edit_message_text(
-        "🌍 Select Country:",
-        reply_markup=InlineKeyboardMarkup(buttons)
-    )
+    num = number['number']
+
+keyboard = [
+    [InlineKeyboardButton("📋 Copy Number", callback_data=f"copy_{num}")],  # 👈 ADD HERE
+    [InlineKeyboardButton("📩 View OTP", callback_data="otp")],
+    [
+        InlineKeyboardButton("🔄 Change Number", callback_data=f"change_{country}"),
+        InlineKeyboardButton("🌍 Change Country", callback_data="get")
+    ],
+    [InlineKeyboardButton("🔙 Back", callback_data="back_main")]
+]
 
 # ================== SELECT COUNTRY ==================
 async def select_country(update: Update, context: ContextTypes.DEFAULT_TYPE):
