@@ -6,7 +6,7 @@ from telegram.ext import (
 import csv
 import random
 
-BOT_TOKEN = "8660826415:AAHsDMwGFatbX-x1kYxO_5mm-oKr2HKiRpk"
+BOT_TOKEN = "8660826415:AAHUpd-k0d3DA1IRWq3CxogKhWIYhC-UqhQ"
 
 # ===== MENU =====
 def menu_keyboard():
