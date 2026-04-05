@@ -3,7 +3,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, fil
 import csv
 import random
 
-BOT_TOKEN = "YOUR_BOT_TOKEN"
+BOT_TOKEN = "8660826415:AAHsDMwGFatbX-x1kYxO_5mm-oKr2HKiRpk"
 
 # ===== MENU KEYBOARD (ONLY USED IN /start) =====
 def menu_keyboard():
