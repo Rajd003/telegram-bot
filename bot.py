@@ -161,6 +161,27 @@ async def support(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.edit_message_text("📞 Contact: @your_username")
 
 # ================== CSV UPLOAD ==================
+async def upload_csv(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.from_user.id != ADMIN_ID:
+        return
+
+    file = await update.message.document.get_file()
+    await file.download_to_drive("data.csv")
+
+    added = 0
+
+    with open("data.csv", newline='', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            if not numbers_col.find_one({"number": row["number"]}):
+                numbers_col.insert_one({
+                    "number": row["number"],
+                    "country": row["country"],
+                    "status": "free"
+                })
+                added += 1
+
+    await update.message.reply_text(f"✅ Added {added} numbers")
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     pass
 
