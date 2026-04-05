@@ -162,6 +162,21 @@ async def support(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ================== CSV UPLOAD ==================
 async def upload_csv(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text
+
+    if text == "📱 Get Number":
+        await update.message.reply_text("Clicked Get Number")
+
+    elif text == "🌍 Available Country":
+        await update.message.reply_text("Clicked Country")
+
+    elif text == "📞 Active Number":
+        await update.message.reply_text("Clicked Active")
+
+    elif text == "☎️ Support":
+        await update.message.reply_text("Clicked Support")
     if update.message.from_user.id != ADMIN_ID:
         return
 
@@ -189,6 +204,7 @@ def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     app.add_handler(CallbackQueryHandler(get_country, pattern="^get$"))
     app.add_handler(CallbackQueryHandler(get_country, pattern="^country$"))
     app.add_handler(CallbackQueryHandler(select_country, pattern="^country\\|"))
