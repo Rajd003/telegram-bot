@@ -4,7 +4,7 @@ import os
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-from telegram import ReplyKeyboardMarkup
+from telegram import Update, ReplyKeyboardMarkup
 
 async def get_country(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
