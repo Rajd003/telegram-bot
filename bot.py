@@ -111,7 +111,7 @@ async def select_country(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     keyboard = [
         [InlineKeyboardButton("📋 Copy Number", callback_data=f"copy_{num}")],
-        [InlineKeyboardButton("📩 View OTP", callback_data="otp")],
+        [InlineKeyboardButton("📩 View OTP", url="https://t.me/otpbossrahul")],
         [
             InlineKeyboardButton("🔄 Change Number", callback_data=f"change_{country}"),
             InlineKeyboardButton("🌍 Change Country", callback_data="get")
