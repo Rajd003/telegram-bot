@@ -1,5 +1,6 @@
 import asyncio
 import csv
+import re
 import os
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -114,14 +115,17 @@ async def select_country(update: Update, context: ContextTypes.DEFAULT_TYPE):
         upsert=True
     )
 
-    keyboard = [
-        [InlineKeyboardButton("📩 View OTP", url="https://t.me/yourchannel")],
-        [
-            InlineKeyboardButton("🔄 Change Number", callback_data=f"change_{country}"),
-            InlineKeyboardButton("🌍 Change Country", callback_data="get")
-        ],
-        [InlineKeyboardButton("🔙 Back", callback_data="back_main")]
-    ]
+    num = number['number']
+
+keyboard = [
+    [InlineKeyboardButton("📋 Copy Number", callback_data=f"copy_{num}")],  # 👈 ADD HERE
+    [InlineKeyboardButton("📩 View OTP", callback_data="otp")],
+    [
+        InlineKeyboardButton("🔄 Change Number", callback_data=f"change_{country}"),
+        InlineKeyboardButton("🌍 Change Country", callback_data="get")
+    ],
+    [InlineKeyboardButton("🔙 Back", callback_data="back_main")]
+]
 
     await query.edit_message_text(
         f"✅ {country} Number Assigned\n\n📱 {number['number']}",
@@ -184,6 +188,16 @@ async def active_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def support(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+    async def copy_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    num = query.data.split("_")[1]
+
+    await query.answer(
+        text=f"Copied: {num}",
+        show_alert=True
+    )
 
     await query.edit_message_text("📞 Contact: @your_username")
 
@@ -199,10 +213,23 @@ async def back_main(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("☎️ Support", callback_data="support")]
     ]
 
-    await query.edit_message_text(
-        "👋 Welcome! Choose your option:",
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+    num = number['number']
+
+keyboard = [
+    [InlineKeyboardButton("📋 Copy Number", callback_data=f"copy_{num}")],
+    [InlineKeyboardButton("📩 View OTP", callback_data="otp")],
+    [
+        InlineKeyboardButton("🔄 Change Number", callback_data=f"change_{country}"),
+        InlineKeyboardButton("🌍 Change Country", callback_data="get")
+    ],
+    [InlineKeyboardButton("🔙 Back", callback_data="back_main")]
+]
+
+await query.edit_message_text(
+    f"✅ {country} Number Assigned\n\n📱 `{num}`",
+    parse_mode="Markdown",
+    reply_markup=InlineKeyboardMarkup(keyboard)
+)
 
 # ================== CSV UPLOAD ==================
 async def upload_csv(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -239,6 +266,16 @@ def main():
     app.add_handler(CallbackQueryHandler(change_number, pattern="^change_"))
     app.add_handler(CallbackQueryHandler(active_number, pattern="^active$"))
     app.add_handler(CallbackQueryHandler(support, pattern="^support$"))
+    async def copy_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    num = query.data.split("_")[1]
+
+    await query.answer(
+        text=f"Copied: {num}",
+        show_alert=True
+    )
     app.add_handler(CallbackQueryHandler(back_main, pattern="^back_main$"))
 
     app.add_handler(MessageHandler(filters.Document.ALL, upload_csv))
