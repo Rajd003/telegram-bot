@@ -4,7 +4,7 @@ import os
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, ReplyKeyboardRemove
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -45,6 +45,7 @@ threading.Thread(target=run_web).start()
 
 # ================== START ==================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     keyboard = [
         [InlineKeyboardButton("📱 Get Number", callback_data="get")],
         [InlineKeyboardButton("🌍 Available Country", callback_data="country")],
@@ -52,10 +53,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("☎️ Support", callback_data="support")]
     ]
 
+    # MAIN MENU
     await update.message.reply_text(
         "👋 Welcome! Choose your option:",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
+
+    # REMOVE OLD BUTTON (IMPORTANT 🔥)
+    await update.message.reply_text(
+        " ",
+        reply_markup=ReplyKeyboardRemove()
+    )
+
 
 # ================== GET COUNTRY ==================
 async def get_country(update: Update, context: ContextTypes.DEFAULT_TYPE):
