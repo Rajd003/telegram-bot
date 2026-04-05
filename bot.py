@@ -102,10 +102,39 @@ async def select_country(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     country = query.data.split("_")[1]
 
-    number = numbers_col.find_one({
-        "country": country,
-        "status": "free"
-    })
+    number = numbers_col.find_one({"country": country, "status": "free"})
+    if not number:
+        await query.edit_message_text("❌ No number available")
+        return
+
+    numbers_col.update_one(
+        {"_id": number["_id"]},
+        {"$set": {"status": "used"}}
+    )
+
+    users_col.update_one(
+        {"user_id": query.from_user.id},
+        {"$set": {"number_id": number["_id"]}},
+        upsert=True
+    )
+
+    num = number['number']
+
+    keyboard = [
+        [InlineKeyboardButton("📋 Copy Number", callback_data=f"copy_{num}")],
+        [InlineKeyboardButton("📩 View OTP", callback_data="otp")],
+        [
+            InlineKeyboardButton("🔄 Change Number", callback_data=f"change_{country}"),
+            InlineKeyboardButton("🌍 Change Country", callback_data="get")
+        ],
+        [InlineKeyboardButton("🔙 Back", callback_data="back_main")]
+    ]
+
+    await query.edit_message_text(
+        f"✅ {country} Number Assigned\n\n📱 `{num}`",
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
 
     if not number:
         await query.edit_message_text("❌ No number available")
@@ -192,18 +221,44 @@ async def active_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 # ================== SUPPORT ==================
-async def support(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    async def copy_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def select_country(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    num = query.data.split("_")[1]
+    country = query.data.split("_")[1]
 
-    await query.answer(
-        text=f"Copied: {num}",
-        show_alert=True
+    number = numbers_col.find_one({"country": country, "status": "free"})
+    if not number:
+        await query.edit_message_text("❌ No number available")
+        return
+
+    numbers_col.update_one(
+        {"_id": number["_id"]},
+        {"$set": {"status": "used"}}
+    )
+
+    users_col.update_one(
+        {"user_id": query.from_user.id},
+        {"$set": {"number_id": number["_id"]}},
+        upsert=True
+    )
+
+    num = number['number']
+
+    keyboard = [
+        [InlineKeyboardButton("📋 Copy Number", callback_data=f"copy_{num}")],
+        [InlineKeyboardButton("📩 View OTP", callback_data="otp")],
+        [
+            InlineKeyboardButton("🔄 Change Number", callback_data=f"change_{country}"),
+            InlineKeyboardButton("🌍 Change Country", callback_data="get")
+        ],
+        [InlineKeyboardButton("🔙 Back", callback_data="back_main")]
+    ]
+
+    await query.edit_message_text(
+        f"✅ {country} Number Assigned\n\n📱 `{num}`",
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
     await query.edit_message_text("📞 Contact: @your_username")
@@ -273,6 +328,7 @@ def main():
     app.add_handler(CallbackQueryHandler(change_number, pattern="^change_"))
     app.add_handler(CallbackQueryHandler(active_number, pattern="^active$"))
     app.add_handler(CallbackQueryHandler(support, pattern="^support$"))
+    app.add_handler(CallbackQueryHandler(copy_number, pattern="^copy_"))
     async def copy_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
