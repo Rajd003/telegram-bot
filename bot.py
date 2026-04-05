@@ -4,15 +4,22 @@ import os
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import (
-    ApplicationBuilder,
-    CommandHandler,
-    CallbackQueryHandler,
-    MessageHandler,
-    ContextTypes,
-    filters,
-)
+from telegram import ReplyKeyboardMarkup
+
+async def get_country(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    countries = numbers_col.distinct("country")
+
+    keyboard = []
+
+    for c in countries:
+        count = numbers_col.count_documents({"country": c, "status": "free"})
+        keyboard.append([f"{c} ({count})"])
+
+    await update.message.reply_text(
+        "🌍 Select Country:",
+        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    )
 
 from pymongo import MongoClient
 
@@ -188,19 +195,42 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
-    if text == "📱 Get Number":
-        await update.message.reply_text("Clicked Get Number")
+    # COUNTRY SELECT
+    if "(" in text and ")" in text:
+        country = text.split(" (")[0]
+
+        number = numbers_col.find_one({
+            "country": country,
+            "status": "free"
+        })
+
+        if not number:
+            await update.message.reply_text("❌ No number available")
+            return
+
+        numbers_col.update_one(
+            {"_id": number["_id"]},
+            {"$set": {"status": "used"}}
+        )
+
+        await update.message.reply_text(
+            f"✅ {country} Number Assigned\n\n📱 {number['number']}"
+        )
+
+    elif text == "📱 Get Number":
+        await get_country(update, context)
 
     elif text == "🌍 Available Country":
-        await update.message.reply_text("Clicked Country")
+        await get_country(update, context)
 
     elif text == "📞 Active Number":
-        await update.message.reply_text("Clicked Active")
+        await active_number(update, context)
 
     elif text == "☎️ Support":
-        await update.message.reply_text("Clicked Support")
-    if update.message.from_user.id != ADMIN_ID:
-        return
+        await update.message.reply_text("📞 Contact: @your_username")
+
+    else:
+        await update.message.reply_text("❌ Invalid option")
 
     file = await update.message.document.get_file()
     await file.download_to_drive("data.csv")
