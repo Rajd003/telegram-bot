@@ -59,7 +59,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(" ", reply_markup=ReplyKeyboardRemove())
 
-# ================== COPY ==================
+# ================== COPY NUMBER ==================
 async def copy_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -143,6 +143,7 @@ async def change_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     keyboard = [
         [InlineKeyboardButton("📋 Copy Number", callback_data=f"copy_{num}")],
+        [InlineKeyboardButton("📩 View OTP", url="https://t.me/otpbossrahul")],
         [
             InlineKeyboardButton("🔄 Change Number", callback_data=f"change_{country}"),
             InlineKeyboardButton("🌍 Change Country", callback_data="get")
@@ -162,7 +163,6 @@ async def active_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     user = users_col.find_one({"user_id": query.from_user.id})
-
     if not user:
         await query.edit_message_text("❌ No active number")
         return
@@ -209,6 +209,9 @@ async def upload_csv(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reader = csv.DictReader(f)
 
         for row in reader:
+            if "number" not in row or "country" not in row:
+                continue
+
             if not numbers_col.find_one({"number": row["number"]}):
                 numbers_col.insert_one({
                     "number": row["number"],
